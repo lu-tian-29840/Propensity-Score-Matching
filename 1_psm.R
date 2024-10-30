@@ -139,7 +139,7 @@ for (i in 1:num_imputations) {
                            Tr = imputed_data_i$r13g198, 
                            X = propensity_scores, 
                            M = 1, caliper = 0.1, 
-                           replace = TRUE)
+                           replace = F)
   
   # 6: Extract matched data
   matched_data_i <- imputed_data_i[unique(c(matching_result$index.treated, matching_result$index.control)), ]
