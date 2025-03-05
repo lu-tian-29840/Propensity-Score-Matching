@@ -1,13 +1,14 @@
 # Code for The Role of Social Ties in the Cognitive Function of Informal Caregivers: Findings from a Population-Based Propensity-Matched Analysis
 ## Code used in the paper:
 ## R version 4.2.2
-## The code consists four parts: 
-### Part 1/4: address missing data and do propensity score matching
-    Step 1: Multiple imputation
-    Step 2: propensity score matching
-    Step 3: balance diagnostics
-### Part 2/4: mediation and bootstrap analysis in matched and unmatched data sets
-    Step 1: analysis after matching
-    Step 2: analysis before matching
-### Part 3/4: code for Table 1
-### Part 4/4: code for Table 2
+## The code consists four sections: 
+### Section 1/4: Data preparation 
+### Section 2/4: Missing patterns and multiple imputation
+### Section 3/4: PSM and modeling
+    #### Part 1: Propensity Score Matching within each imputed dataset
+    #### Part 2: Love plot and balance assessments 
+    #### Part 3: Bootstrap analysis
+    #### part 4: Table 2 in manuscript
+### Part 4/4: Table 1 (across 20 imputed datasets)
+    #### Part 1: Before matching
+    #### Part 2: After matching
