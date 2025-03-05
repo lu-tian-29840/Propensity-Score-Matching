@@ -1,161 +1,200 @@
+# Peoject: caregiving and cognition--psm approach
+# code for Jounbal of aging and health
+# caregiving variables are th eones difference than prebious version
+# Feb 21, 2025
+# Author: Lu Tian
 
-#@@ Author: Lu Tian
-#@@ Date: Sep 26, 2024
-#@@ Project name: The Role of Social Ties in the Cognitive Function of Informal Caregivers:
-#@@ Findings from a Population-Based Propensity-Matched Analysis
-
-### Part 1/4
-    # Step 1: Multiple imputation
-    # Step 2: propensity score matching
-    # Step 3: balance diagnostics
-
-library(MatchIt)  # for PSM
-library(cobalt)   #balance diagnostics
-library(Matching) # for PSM
-library(rgenoud)
-library(stargazer)
-library(broom)
-library(knitr)
-library(mediation)
-library(tableone)
-library(mice) 
-library(optmatch)
-library(tableone)
-library(flextable)
-library(officer)
-library(dplyr)
-library(kableExtra)
-
-### Step  1
-### Multiple imputation
-#  1 
-#  choose variables to be imputed
-df.psm <- dplyr::select(df.mi1, rahhidpn, r13g198,
-                         women, white, black, hispanic, other, married, sepdiv, widow, nevermarr, 
-                         lshs, hs, somecoll, coll, raevbrn, study,
-                         r13cogtot, r13age, log_h13itot, r13hibpe, r13diabe,
-                         r13cancre, r13hearte, r13stroke, r13cesd, h13child,
-                         r13livsib, r13momliv, r13dadliv,
-                         r14mstat, r14hibpe, r14diabe, r14cancre, r14hearte, r14stroke, 
-                         r14cesd, h14child, r14livsib, r14cogtotp, r14momliv, r14dadliv,
-                         r15cogtotp, r15age, r15hibpe, r15diabe, r15cancre,
-                         r15hearte, r15stroke, r15cesd, h15child, r15livsib,
-                         lb003_a,   lb004a_a, lb004b_a, lb004c_a, lb004d_a, lb004e_a, lb004f_a, lb004g_a, 
-                         lb005_a,   lb005a_a, lb005b_a, 
-                         lb006_a,   lb007a_a, lb007b_a, lb007c_a,  lb007d_a, lb007e_a, lb007f_a, lb007g_a, 
-                         lb008a_a,  lb008b_a, lb008c_a, lb008d_a,
-                         lb009_a,   lb010_a, lb011a_a, lb011b_a, lb011c_a,
-                         lb011d_a,  lb011e_a, lb011f_a, lb011g_a, 
-                         lb012a_a,  lb012b_a, lb012c_a, lb012d_a, 
-                         lb013_a,   lb013a_a, lb014_a,
-                         lb015a_a, lb015b_a, lb015c_a, lb015d_a, lb015e_a,lb015f_a, lb015g_a, 
-                         lb016a_a, lb016b_a, lb016c_a, lb016d_a,lb017_a, 
-                         ties, composition, sp_sup, child_sup, fam_sup, fri_sup) 
-
-    # Define how missing values are handled
-    binary_vars <- c("r13g198", "lb003_a", "lb006_a", "lb010_a", 
-                     "r13momliv", "r13dadliv", "r14momliv", "r14dadliv", "lb014_a")
-    df.psm <- df.psm %>%
-    mutate(across(all_of(binary_vars), as.factor))
-
-    method_list <- sapply(df.mi2a, function(x) {
-      if(is.factor(x)) "polyreg" else "pmm"
-      })
-
-#  2
-# MI 
-psm_imputed <- mice(df.psm, method = method_list, m = 10, seed = 123, maxit = 20)
-saveRDS(psm_imputed, file = "psm_imputed.rds")
-
-    # checking missing after  MI 
-    # Loop through each imputed dataset and check for missing values
-    for (i in 1:10) {
-      # Extract the ith imputed dataset
-     imputed_data <- complete(psm_imputed, i)
-  
-      # Check for missing values in the dataset
-      print(paste("Missing values in Imputed Dataset", i))
-  
-      # Print the sum of all missing values
-      print(paste("Total missing values:", sum(is.na(imputed_data))))
-    }
-
-    # Loop through each imputed dataset and check r13g198 for missing values
-    for (i in 1:10) {
-      # Extract the ith imputed dataset
-      imputed_data <- complete(psm_imputed, i)
-  
-      # Check for missing values in r13g198
-      cat("Imputed Dataset", i, " - Number of NAs in r13g198:", sum(is.na(imputed_data$r13g198)), "\n")}
-  
-
-# save.image("~/LT/cross/cross1/Lu2_psm.RData")
-
-
-################################################################################  
+### Sections 
+#   Section 1: Prepare data and create variables 
 
 
 
 
-### Step  2
- #   LOOP for PSM and balance diagnostics
- #   Match(): better for matching and checking the balance diagnostics
- #   MatchIt(): better for matched data sets extract
 
- # Number of imputations 
-num_imputations <- 10
 
-# Create a list to store matched datasets
-matched_data_list <- vector("list", num_imputations)
+###################################################################################################
+#                              <Section One >  Prepare data and create variables
+###################################################################################################
 
-# Loop over each imputed dataset
-for (i in 1:num_imputations) {
-  
-  # 1: Extract the ith imputed dataset
-  imputed_data_i <- complete(psm_imputed, i)
-  
-  imputed_data_i$r13g198 <- imputed_data_i$r13g198 == 1 
-  
-  # 2: Calculate Propensity Scores using logistic regression (glm)
-  ps_model <- glm(r13g198 ~ r13cogtot + r13age + women + black + hispanic + other 
-                  + sepdiv + widow + nevermarr + hs + somecoll + coll
-                  + log_h13itot + r13hibpe + r13diabe + r13cancre + r13hearte 
-                  + r13stroke + r13cesd,
-                  family = binomial(link = "probit"), data = imputed_data_i)
-  
-  # 3: Extract the Propensity Scores
-  propensity_scores <- ps_model$fitted.values
-  
-  # 4: Perform pre-matching balance check
-  print(paste("Pre-matching balance diagnostics", i))
-  MatchBalance(r13g198 ~ r13cogtot + r13age + women + black + hispanic + other 
-               + sepdiv + widow + nevermarr + hs + somecoll + coll
-               + log_h13itot + r13hibpe + r13diabe + r13cancre + r13hearte 
-               + r13stroke + r13cesd,
-               data = imputed_data_i)
-  
-  # 5: Perform matching using the Matching package
-  matching_result <- Match(Y = imputed_data_i$r15cogtotp, 
-                           Tr = imputed_data_i$r13g198, 
-                           X = propensity_scores, 
-                           M = 1, caliper = 0.1, 
-                           replace = F)
-  
-  # 6: Extract matched data
-  matched_data_i <- imputed_data_i[unique(c(matching_result$index.treated, matching_result$index.control)), ]
-  
-  # 7: Store the matched dataset
-  matched_data_list[[i]] <- matched_data_i
-  
-  # 8: Check balance diagnostics
-  print(paste("Balance diagnostics", i))
-  MatchBalance(r13g198 ~ r13cogtot + r13age + women + black + hispanic + other 
-               + sepdiv + widow + nevermarr + hs + somecoll + coll
-               + log_h13itot + r13hibpe + r13diabe + r13cancre + r13hearte 
-               + r13stroke + r13cesd,
-               data = imputed_data_i, 
-               match.out = matching_result)
+# Part 1
+######################  Merge data: 2016 half sample creation ######################     
+
+# 1. Load data
+hrs2020  <- readRDS("hrs2020.rds")
+lbq2016 <- readRDS("lbq2016.rds")
+rand2016 <- readRDS("rand2016.rds")
+df.trk2016_clean <- readRDS("df.trk2016_clean.rds")
+cognition2016 <- readRDS("cognition2016.rds")
+care2016 <- readRDS("care2016.rds") 
+
+
+# 1) merge lbq2016 and df.trk2016_clean
+merged_data1 <- merge(lbq2016, df.trk2016_clean, by = "rahhidpn") # lbq2016: r13001A
+merged_data1$hhid.y <- NULL 
+merged_data1 <- merged_data1 %>% rename(hhid = hhid.x) %>%  arrange(rahhidpn) 
+
+# 2) merge merged_data1 and rand2016
+merged_data2 <- merge(merged_data1, rand2016, by = "rahhidpn") %>% arrange(rahhidpn)
+
+# 3) Merge merged_data2 and cognition2016
+merged_data3 <- merge(merged_data2, cognition2016, by = "rahhidpn") %>% arrange(rahhidpn)
+
+# 4) Merge merged_data3 and h16f_r
+hrs2016 <- merge(merged_data3, care2016, by = "rahhidpn") %>% arrange(rahhidpn)
+
+hrs2016$samp2016 <- 1
+
+# 5) Retain one value for variables that have subffix .y and .x
+# Get the column names
+col_names <- colnames(hrs2016)
+# Identify and remove the .y variables
+overlap_vars_y <- grep("\\.y$", col_names, value = T)
+hrs2016 <- hrs2016[, !names(hrs2016) %in% overlap_vars_y]
+# Rename the .x variables to remove the .x suffix
+new_col_names <- gsub("\\.x$", "", colnames(hrs2016))
+colnames(hrs2016) <- new_col_names
+
+saveRDS(hrs2016,"hrs2016.rds")
+
+# Part 2
+######################  Merge data: 2018 half sample creation ######################  
+lbq2018 <- readRDS("lbq2018.rds")
+df.trk2018_clean <- readRDS("df.trk2018_clean.rds")
+rand2018 <- readRDS("rand2018.rds")
+cognition2018 <- readRDS("cognition2018.rds")
+
+# 1) Merge lbq2018 and df.trk2018_clean
+merged_data1a <- merge(lbq2018, df.trk2018_clean, by = "rahhidpn")
+merged_data1a$hhid.y <- NULL 
+merged_data1a <- merged_data1a %>% rename(hhid = hhid.x) %>%  arrange(rahhidpn) 
+
+# 2) merge merged_data1a and rand2018
+merged_data2a <- merge(merged_data1a, rand2018, by = "rahhidpn") %>% arrange(rahhidpn)
+
+
+# 3) Merge merged_data2a and cognition2018
+hrs2018 <- merge(merged_data2a, cognition2018, by = "rahhidpn") %>% arrange(rahhidpn)
+
+# flag 2018 sample  
+hrs2018$samp2018 <- 1
+
+
+# 4) Retain one value for variables that have subffix .y and .x
+# Get the column names
+col_names <- colnames(hrs2018)
+# Identify and remove the .y variables
+overlap_vars_y <- grep("\\.y$", col_names, value = T)
+hrs2018 <- hrs2018[, !names(hrs2018) %in% overlap_vars_y]
+# Identify and remove the .y variables
+new_col_names <- gsub("\\.x$", "", colnames(hrs2018))
+
+colnames(hrs2018) <- new_col_names
+
+# 6) save hrs2018
+saveRDS(hrs2018,"hrs2018.rds")
+
+
+# Part 3
+######    Bind rows of hrs2016 and hrs2018 for full sample of social support     #####
+
+# 1) Remove the "r13" prefix and add "_a" suffix to each column name
+# Make a copy of hrs2016
+hrs2016_a <- hrs2016
+# Get the existing column names
+old_colnames <- colnames(hrs2016)
+# Initialize new_colnames as empty to be populated inside the loop
+new_colnames <- character(length(old_colnames))
+
+# Loop through each column name
+for (i in 1:length(old_colnames)) {
+  # If the column name starts with "r13", remove it and add "_a"
+  if (grepl("^r13", old_colnames[i])) {
+    new_colnames[i] <- paste0(sub("^r13", "", old_colnames[i]), "_a")
+  } else {
+    new_colnames[i] <- old_colnames[i]
+  }
 }
 
+# Set the new column names to the data frame
+colnames(hrs2016_a) <- new_colnames
+
+
+# 2) Remove the "r14" prefix and add "_a" suffix to each column name
+# Get the existing column names
+hrs2018_a <- hrs2018
+old_colnames <- colnames(hrs2018)
+# Initialize new_colnames as empty to be populated inside the loop
+new_colnames <- character(length(old_colnames))
+
+# Loop through each column name
+for (i in 1:length(old_colnames)) {
+  # If the column name starts with "r14", remove it and add "_a"
+  if (grepl("^r14", old_colnames[i])) {
+    new_colnames[i] <- paste0(sub("^r14", "", old_colnames[i]), "_a")
+  } else {
+    new_colnames[i] <- old_colnames[i]
+  }
+}
+# Set the new column names to the data frame
+colnames(hrs2018_a) <- new_colnames
+
+# 3) Bind rows pf hrs2016 and hrs2018
+
+# Selecting socual support relevant columns
+hrs2016_ss <- dplyr::select(hrs2016_a, rahhidpn, lb001a_a, lb003_a:lb005b_a, lb006_a:lb017_a, lbcomp_a, lbelig_a, rescode_a)
+
+hrs2016_ss$year <- 2016
+hrs2016_ss$plqcomp <- ifelse(hrs2016_ss$lbelig_a == 1 & hrs2016_ss$lbcomp_a %in% c(1, 2), 1, 0) # binary indicators for PLQ completion 
+
+hrs2018_ss <- dplyr::select(hrs2018_a, rahhidpn, lb001a_a, lb003_a:lb005b_a, lb006_a:lb017_a, lbcomp_a, lbelig_a, rescode_a)
+hrs2018_ss$year <- 2018
+
+hrs2018_ss$plqcomp <- ifelse(hrs2018_ss$lbelig_a == 1 & hrs2018_ss$lbcomp_a %in% c(1, 2), 1, 0)
+
+hrs_2016_2018_ss <- rbind(hrs2016_ss, hrs2018_ss) %>% 
+  arrange(rahhidpn) %>%      # n=37864 
+  filter(rescode_a == 1001, (lbcomp_a == 1 | lbcomp_a == 2), lbelig_a == 1) # 12011; unique ID# 
+
+# 4)  merge
+df2016a <- merge(care2016, cognition2016, by = "rahhidpn") %>% arrange(rahhidpn)
+df2016b <- merge(df2016a, rand2016, by = "rahhidpn") %>% arrange(rahhidpn)
+df2016c <- merge(df2016b, df.trk2016_clean, by = "rahhidpn") %>% arrange(rahhidpn)
+df2016_2018a <- merge(df2016c, hrs_2016_2018_ss, by = "rahhidpn") %>% arrange(rahhidpn)
+df2016_2018b <- merge(df2016_2018a, rand2018, by = "rahhidpn") %>% arrange(rahhidpn)
+df2016_2018 <- merge(df2016_2018b, cognition2018, by = "rahhidpn") %>% arrange(rahhidpn)
+
+
+# 5) Retain one value for variables that have subffix .y and .x
+# Get the column names
+col_names <- colnames(df2016_2018)
+# Identify and remove the .y variables
+overlap_vars_y <- grep("\\.y$", col_names, value = T)
+df2016_2018 <- df2016_2018[, !names(df2016_2018) %in% overlap_vars_y]
+# Identify and remove the .y variables
+new_col_names <- gsub("\\.x$", "", colnames(df2016_2018))
+colnames(df2016_2018) <- new_col_names
+
+# Part 4
+######################   merge df2016_2018 + 2020 ###################### 
+hrs2020_a <- hrs2020 %>% 
+  dplyr::select(rahhidpn, r15age:samp2020, -version, -raceth, -women, -study_cog)
+
+df_full <- merge(df2016_2018, hrs2020_a, by = "rahhidpn") %>% arrange(rahhidpn)
+names(df_full)
+# Part 5
+###################### Variable selection  ###################### 
+fullsamp2016_2020 <-  df_full %>% 
+  dplyr::select(rahhidpn, hhid, pn, 
+                r13f001:r13status, study_cog, r13mstat:birthmo, birthyr, degree, gender, race, schlyrs, secu, stratum, study,
+                r13age, r13alive, raceth, women, lb001a_a, lb003_a:plqcomp, 
+                r14mstat:r14status,
+                r15age, r15alive, r15proxy, r15rescode, r15cogtotp, r15status, r15hibpe:samp2020) %>%    # 11915
+  filter(r15rescode == 1001)  %>%  # 10350
+  filter(r13status == 1)  %>%  # 10329
+  filter(r15status == 1)  %>% # 9645 
+  filter(r14status == 1) %>%  # 9472
+  arrange(rahhidpn)
+
+saveRDS(fullsamp2016_2020,"fullsamp2016_2020.rds")
 
 
