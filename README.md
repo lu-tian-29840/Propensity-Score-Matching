@@ -9,6 +9,6 @@
     Part 2: Love plot and balance assessments 
     Part 3: Bootstrap analysis
     part 4: Table 2 in manuscript
-### Part 4/4: Table 1 (across 20 imputed datasets)
+### Section 4/4: Table 1 (across 20 imputed datasets)
     Part 1: Before matching
     Part 2: After matching
