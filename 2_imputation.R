@@ -5,7 +5,7 @@
 # Author: Lu Tian
 
 
-### Sections 
+### Sections 2/4
 #   Section 2: Skip patterns for network features and multiple imputation
 
 library(tidyverse)    # loads dplyr, ggplot2, tidyr, tibble, etc. see tidyverse.org/packages
